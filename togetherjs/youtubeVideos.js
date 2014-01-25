@@ -18,6 +18,24 @@ function ($, util, session, elementFinder) {
     }
   });
 
+  session.on("close", function () {
+    $(youTubeIframes).each(function (i, iframe) {
+      // detach players from iframes
+      $(iframe).removeData("togetherjs-player");
+      $(iframe).removeData("dontPublish");
+      $(iframe).removeData("currentVideoId");
+      // disable iframeAPI
+      $(iframe).removeAttr("enablejsapi");
+      // remove unique youtube iframe indicators
+      var id = $(iframe).attr("id") || "";
+      if (id.indexOf("youtube-player") === 0) {
+        // An id we added
+        $(iframe).removeAttr("id");
+      }
+      youTubeIframes = [];
+    });
+  });
+
   TogetherJS.config.track("youtube", function (track, previous) {
     if (track && ! previous) {
       prepareYouTube();
@@ -59,11 +77,12 @@ function ($, util, session, elementFinder) {
     function setupYouTubeIframes() {
       var iframes = $('iframe');
       iframes.each(function (i, iframe) {
-        // look for YouTube Iframes
         // if the iframe's unique id is already set, skip it
-        if ($(iframe).attr("src").indexOf("youtube") != -1 && !$(iframe).attr("id")) {
+        // FIXME: what if the user manually sets an iframe's id (i.e. "#my-youtube")?
+        // maybe we should set iframes everytime togetherjs is reinitialized?
+        if (($(iframe).attr("src") || "").indexOf("youtube") != -1 && !$(iframe).attr("id")) {
           $(iframe).attr("id", "youtube-player"+i);
-          $(iframe).attr("ensablejsapi", 1);
+          $(iframe).attr("enablejsapi", 1);
           youTubeIframes[i] = iframe;
         }
       });
@@ -86,9 +105,14 @@ function ($, util, session, elementFinder) {
   } // end of prepareYouTube
 
   function publishPlayerStateChange(event) {
-    var currentPlayer = event.target;
-    var currentIframe = currentPlayer.a;
-    var currentTime = currentPlayer.getCurrentTime();
+    var target = event.target; 
+    var currentIframe = target.a;
+    // FIXME: player object retrieved from event.target has an incomplete set of essential functions
+    // this is most likely due to a recently-introduced problem with current YouTube API as others have been reporting the same issue (12/18/`13)
+    //var currentPlayer = target;
+    //var currentTime = currentPlayer.getCurrentTime();
+    var currentPlayer = $(currentIframe).data("togetherjs-player");
+    var currentTime = target.k.currentTime;
     var iframeLocation = elementFinder.elementLocation(currentIframe);
 
     if ($(currentPlayer).data("seek")) {
